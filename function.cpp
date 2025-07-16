@@ -1,79 +1,180 @@
-#include<graphics.h>     //Í¼ĞÎ¿âÍ·ÎÄ¼ş
-#include<cmath>
-#include<stdio.h>
-#include<conio.h>
-#include"head.h"
+#ifndef ENABLE_BLEND
+#define ENABLE_BLEND 0x00000040
+#endif
 
-void game_init()
+#ifndef ENABLE_HIGHDPI
+#define ENABLE_HIGHDPI 0x00000080
+#endif
+
+#include <graphics.h>
+#include <cmath>
+#include <stdio.h>
+#include <conio.h>
+#include <fstream>
+#include <ctime>
+#include "head.h"
+
+// æ–¹å‘å‡½æ•°å¯¹è±¡
+
+struct Up 
 {
-    //¼ÆËã¸ñ×Ó×ø±ê
-	for (int i = 0; i < MAX_GRID; i++)
-	{
-		for (int k = 0; k < MAX_GRID; k++)
-		{
-			b[i][k].x = k * GRID_WIDTH + (k + 1) * INTERVAL;
-            b[i][k].y = i * GRID_WIDTH + (i + 1) * INTERVAL;
-		}
-	}
-    srand(GetTickCount());//Ëæ»úÊıÖÖ×Ó(¿ª»úÊ±¼ä)
-    //Ëæ»úÉú³ÉÁ©´øÊı×ÖµÄ¸ñ×Ó
-    for (int p = 0; p < 2; p++)
-        putIn();
+    static const bool isVertical = true;
+    static const bool isIncreasing = false;
+    int next(int i) const { return i - 1; }
+    bool isValid(int i) const { return i > 0; }
+};
+
+struct Down 
+{
+    static const bool isVertical = true;
+    static const bool isIncreasing = true;
+    int next(int i) const { return i + 1; }
+    bool isValid(int i) const { return (i < MAX_GRID - 1); }
+};
+
+struct Left
+{
+    static const bool isVertical = false;
+    static const bool isIncreasing = false;
+    int next(int i) const { return i - 1; }
+    bool isValid(int i) const { return i > 0; }
+};
+
+struct Right 
+{
+    static const bool isVertical = false;
+    static const bool isIncreasing = true;
+    int next(int i) const { return i + 1; }
+    bool isValid(int i) const { return i < MAX_GRID - 1; }
+};
+
+Game::Game() : flag(false), currentScore(0), highScore(0) 
+{
+    arr = { zero, twoTo1, twoTo2, twoTo3, twoTo4, twoTo5, twoTo6, twoTo7, twoTo8, twoTo9, twoTo10, twoTo11, back };
+    b.resize(MAX_GRID, std::vector<Box>(MAX_GRID));
 }
 
-void game_draw()
+void Game::start()
 {
-    for (int i = 0; i < MAX_GRID; i++)
+    std::ifstream inFile("highscore.dat");
+    if (inFile) 
     {
-        for (int k = 0; k < MAX_GRID; k++)
+        inFile >> highScore;
+        inFile.close();
+    }
+
+    BeginScreen();
+
+    initgraph(WINDOW_WIDTH, WINDOW_HEIGHT, SHOWCONSOLE | ENABLE_BLEND | ENABLE_HIGHDPI);
+    setbkcolor(arr[12]);
+    cleardevice();
+
+    // è®¾ç½®ç»˜å›¾ç›®æ ‡ä¸ºå†…å­˜ç¼“å†²åŒº
+    SetWorkingImage(NULL);      // ç¡®ä¿ç»˜åˆ¶åˆ°å±å¹•
+    BeginBatchDraw();           // å¼€å§‹æ‰¹é‡ç»˜åˆ¶
+
+    init();
+    while (1) 
+    {
+        draw();
+        drawScore();
+        FlushBatchDraw(); // åˆ·æ–°æ‰¹é‡ç»˜åˆ¶
+        control();
+        judge();
+
+        if (isGameOver())
         {
-            //ÅĞ¶Ï¸ñ×ÓÀïµÄÖµÊÇ¶àÉÙ
+            printf("game over");
+            break;
+        }
+        if (isGameWon()) 
+        {
+            printf("You Win!");
+            break;
+        }
+        Sleep(10); // æ·»åŠ çŸ­æš‚å»¶è¿Ÿå‡å°‘CPUå ç”¨
+    }
+    EndBatchDraw(); // ç»“æŸæ‰¹é‡ç»˜åˆ¶
+    getchar();
+    closegraph();
+}
+
+void Game::init() 
+{
+    currentScore = 0;
+
+    for (int i = 0; i < MAX_GRID; ++i)
+    {
+        for (int k = 0; k < MAX_GRID; ++k)
+        {
+            b[i][k].x = k * GRID_WIDTH + (k + 1) * INTERVAL;
+            b[i][k].y = i * GRID_WIDTH + (i + 1) * INTERVAL + 50;
+        }
+    }
+    srand(static_cast<unsigned int>(GetTickCount()));
+   
+    for (int p = 0; p < 2; ++p) 
+    {
+        putIn();
+    }
+}
+
+void Game::draw() 
+{
+    setfillcolor(back);
+    solidrectangle(0, 50, WINDOW_WIDTH, WINDOW_HEIGHT - 100);
+
+    for (int i = 0; i < MAX_GRID; ++i)
+    {
+        for (int k = 0; k < MAX_GRID; ++k) 
+        {
+            // åªé‡ç»˜æœ‰å˜åŒ–çš„æ ¼å­
             if (b[i][k].index == 0)
-                setfillcolor(arr[0]);
-            else
             {
-                for (int j = 0; j < 12; j++)
+                setfillcolor(arr[0]);
+            }
+            else 
+            {
+                for (int j = 0; j < 12; ++j)
                 {
-                    if (pow(2, j) == b[i][k].index)
+                    if (std::pow(2, j) == b[i][k].index)
+                    {
                         setfillcolor(arr[j]);
+                        break; // æ‰¾åˆ°é¢œè‰²åç«‹å³è·³å‡ºå¾ªç¯
+                    }
                 }
             }
-            solidrectangle(b[i][k].x, b[i][k].y, b[i][k].x + GRID_WIDTH, b[i][k].y + GRID_WIDTH);//»­¸ñ×ÓÉÏÉ«
-            if (b[i][k].index != 0)        
+
+            solidrectangle(b[i][k].x, b[i][k].y, b[i][k].x + GRID_WIDTH, b[i][k].y + GRID_WIDTH);
+
+            if (b[i][k].index != 0)
             {
                 TCHAR number[5];
                 settextcolor(RGB(119, 110, 101));
-                settextstyle(60, 0,_T("Î¢ÈíÑÅºÚ"));
-                setbkmode(TRANSPARENT);                               //±³¾°Ä£Ê½Í¸Ã÷
-                // ¸ñÊ½»¯ÒªÏÔÊ¾µÄÊı×Ö
+                settextstyle(60, 0, _T("å¾®è½¯é›…é»‘"));
+                setbkmode(TRANSPARENT);
                 _stprintf_s(number, _T("%d"), b[i][k].index);
 
-                // ¼ÆËãÎÄ×Ö³ß´ç
-                int textW = textwidth(number);   // »ñÈ¡ÎÄ×Ö¿í¶È
-                int textH = textheight(number);  // »ñÈ¡ÎÄ×Ö¸ß¶È
+                int textW = textwidth(number);
+                int textH = textheight(number);
 
-                // ¼ÆËã¾ÓÖĞ×ø±ê£¨×ø±êĞŞÕı£©
-                int centerX = b[i][k].x + (GRID_WIDTH - textW) / 2;  // Ë®Æ½¾ÓÖĞ
-                int centerY = b[i][k].y +(GRID_WIDTH - textH) / 2; // ´¹Ö±¾ÓÖĞ
+                int centerX = b[i][k].x + (GRID_WIDTH - textW) / 2;
+                int centerY = b[i][k].y + (GRID_WIDTH - textH) / 2;
 
-                // Êä³öÎÄ×Ö£¨×¢Òâ£ºouttextxyµÄ×ø±êÊÇÎÄ×Ö×óÏÂ½Ç×ø±ê£©
-                outtextxy(centerX, centerY, number);  
-            }  
+                outtextxy(centerX, centerY, number);
+            }
         }
     }
 }
-    
-int twoOrfour()
+
+int Game::twoOrfour()
 {
-    if (rand() % 2 == 1)
-        return 4;
-    else
-        return 2;
+    return (rand() % 2 == 1) ? 4 : 2;
 }
 
-void putIn()
+void Game::putIn()
 {
-    while (1)
+    while (true)
     {
         int x = rand() % MAX_GRID;
         int y = rand() % MAX_GRID;
@@ -86,180 +187,219 @@ void putIn()
     }
 }
 
-void game_control()
+void Game::control() 
 {
-    char key = _getch();
-    switch (key)
-    {
-    case'w':case'W':case 72:
-    {
-        moveup();
-        printf("up\n");
-    }break;
-    case's':case'S':case 80:
-    {
-        movedown();
-        printf("down\n");
-    }break;
-    case'a':case'A':case 75:
-    {
-        moveleft();
-        printf("left\n");
-    }break;
-    case'd':case'D':case 77:
-    {
-        moveright();
-        printf("right\n");
-    }break; 
+    static DWORD lastInputTime = 0;
+    DWORD currentTime = GetTickCount();
+
+    // æ·»åŠ è¾“å…¥å»¶è¿Ÿï¼Œé˜²æ­¢å¤„ç†è¿‡å¿«
+    if (currentTime - lastInputTime < 100)
+    { // 100æ¯«ç§’å»¶è¿Ÿ
+        return;
     }
-    
+
+    if (_kbhit())
+    {
+        char key = _getch();
+        lastInputTime = currentTime;
+
+        switch (key)
+        {
+        case 'w': case 'W': case 72:
+            move(Up());
+            break;
+        case 's': case 'S': case 80:
+            move(Down());
+            break;
+        case 'a': case 'A': case 75:
+            move(Left());
+            break;
+        case 'd': case 'D': case 77:
+            move(Right());
+            break;
+        case 'r': case 'R': // æ·»åŠ é‡æ–°å¼€å§‹åŠŸèƒ½
+            init();
+            break;
+        case 27: // ESCé”®é€€å‡º
+            exit(0);
+        }
+    }
 }
 
-void judge()
+template<typename Direction>
+void Game::move(Direction dir)
+{
+    flag = false;
+
+    // æ ¹æ®æ–¹å‘ç¡®å®šå¤–å±‚å’Œå†…å±‚å¾ªç¯
+    for (int outer = 0; outer < MAX_GRID; ++outer) 
+    {
+        // å¯¹äºå‚ç›´ç§»åŠ¨(ä¸Šä¸‹)ï¼Œå¤„ç†æ¯ä¸€åˆ—
+        // å¯¹äºæ°´å¹³ç§»åŠ¨(å·¦å³)ï¼Œå¤„ç†æ¯ä¸€è¡Œ
+        for (int inner = (dir.isIncreasing ? MAX_GRID - 2 : 1);(dir.isIncreasing ? inner >= 0 : inner < MAX_GRID);(dir.isIncreasing ? inner-- : inner++))
+        {
+
+            int i = dir.isVertical ? inner : outer;
+            int j = dir.isVertical ? outer : inner;
+
+            if (b[i][j].index == 0) continue;
+
+            int current = dir.isVertical ? i : j;
+            int nextPos = dir.next(current);
+
+            while (dir.isValid(current))
+            {
+                int next_i = dir.isVertical ? nextPos : i;
+                int next_j = dir.isVertical ? j : nextPos;
+
+                if (b[next_i][next_j].index == 0)
+                {
+                    // ç§»åŠ¨åˆ°ç©ºä½ç½®
+                    b[next_i][next_j].index = b[i][j].index;
+                    b[i][j].index = 0;
+                    i = next_i;
+                    j = next_j;
+                    current = nextPos;
+                    nextPos = dir.next(current);
+                    flag = true;
+                }
+                else if (b[next_i][next_j].index == b[i][j].index) 
+                {
+                    // åˆå¹¶ç›¸åŒæ•°å­—
+                    b[next_i][next_j].index *= 2;
+                    b[i][j].index = 0;
+                    currentScore += b[next_i][next_j].index;
+                    flag = true;
+                    break;
+                }
+                else
+                {
+                    // ä¸èƒ½ç§»åŠ¨æˆ–åˆå¹¶
+                    break;
+                }
+            }
+        }
+    }
+}
+void Game::judge()
 {
     if (flag)
     {
         putIn();
         flag = false;
+        updateHighScore();
     }
 }
 
-void moveleft() 
+bool Game::isGameWon()
 {
-    for (int i = 0; i < MAX_GRID; i++)
-    {                                            // ±éÀúÃ¿Ò»ĞĞ
-        int temp = 0;                            // µ±Ç°ĞĞ¿ÉºÏ²¢/ÒÆ¶¯µÄÎ»ÖÃ£¨´Ó×ó¿ªÊ¼£©
-        for (int begin = 1; begin < MAX_GRID; begin++)
-        {                                        // ´ÓµÚ2ÁĞ¿ªÊ¼ÏòÓÒ¼ì²é
-            if (b[i][begin].index != 0)
-            {                                    // µ±Ç°ÔªËØ·Ç¿Õ
-                if (b[i][temp].index == 0)
-                {                                // Ä¿±êÎ»ÖÃÎª¿Õ£¬Ö±½ÓÒÆ¶¯
-                    b[i][temp].index = b[i][begin].index;
-                    b[i][begin].index = 0;
-                }
-                else if (b[i][temp].index == b[i][begin].index) 
-                {                                // ¿ÉºÏ²¢
-                    b[i][temp].index += b[i][begin].index;
-                    b[i][begin].index = 0;
-                }
-                else 
-                {                                // ²»ÄÜºÏ²¢£¬ÒÆ¶¯µ½temp+1µÄÎ»ÖÃ
-                    b[i][temp + 1].index = b[i][begin].index;
-                    if (temp + 1 != begin) 
-                    {                            // ±ÜÃâÔ­µØ¸²¸Ç
-                        b[i][begin].index = 0;
-                    }
-                                                // ¸üĞÂ¿É²Ù×÷Î»ÖÃ
-                }
-                temp++;
-                flag = true;                    // ±ê¼Ç×´Ì¬±ä»¯
-            }
-        }
-    }
-}
-
-void movedown()
-{
-    for (int i = 0; i < MAX_GRID; i++)
+    for (int i = 0; i < MAX_GRID; ++i) 
     {
-        int temp = MAX_GRID - 1;                    // µ±Ç°ÁĞ¿ÉºÏ²¢/ÒÆ¶¯µÄÎ»ÖÃ£¨´Óµ×²¿¿ªÊ¼£©
-        for (int begin = MAX_GRID - 2; begin >= 0; begin--)
-        {                                           // ´Óµ¹ÊıµÚ2ĞĞÏòÉÏ¼ì²é
-            if (b[begin][i].index != 0)
-            {                                       // µ±Ç°ÔªËØ·Ç¿Õ
-                if (b[temp][i].index == 0)
-                {                                   // Ä¿±êÎ»ÖÃÎª¿Õ£¬Ö±½ÓÒÆ¶¯
-                    b[temp][i].index = b[begin][i].index;
-                    b[begin][i].index = 0;
-                }
-                else if (b[temp][i].index == b[begin][i].index)
-                {                                   // ¿ÉºÏ²¢
-                    b[temp][i].index += b[begin][i].index;
-                    b[begin][i].index = 0;
-                }
-                else
-                {                                   // ²»ÄÜºÏ²¢£¬ÒÆ¶¯µ½temp-1µÄÎ»ÖÃ
-                    b[temp - 1][i].index = b[begin][i].index;
-                    if (temp - 1 != begin)
-                    {                               // ±ÜÃâÔ­µØ¸²¸Ç
-                        b[begin][i].index = 0;
-                    }
-                                                    // ¸üĞÂ¿É²Ù×÷Î»ÖÃ
-                }
-                temp--;
-                flag = true;                        // ±ê¼Ç×´Ì¬±ä»¯
-            }
-        }
-    }
-}
-
-void moveup()
-{
-    for (int i = 0; i < MAX_GRID; i++)
-    {
-        int temp = 0;
-        for (int begin = 1; begin < MAX_GRID; begin++)
+        for (int j = 0; j < MAX_GRID; ++j)
         {
-            if (b[begin][i].index != 0)
+            if (b[i][j].index == 2048)
             {
-                if (b[temp][i].index == 0)
-                {
-                    b[temp][i].index = b[begin][i].index;
-                    b[begin][i].index = 0;
-                }
-
-                else if (b[temp][i].index == b[begin][i].index)
-                {
-                    b[temp][i].index += b[begin][i].index;
-                    b[begin][i].index = 0;
-                }
-
-                else
-                {
-                    b[temp+1][i].index = b[begin][i].index;
-                    if (temp + 1 != begin)
-                    {
-                        b[begin][i].index = 0;
-                    }
-                }
-                temp++;
-                flag = true;
+                return true;
             }
+        }
+    }
+    return false;
+}
+
+bool Game::isGameOver()
+{
+    // æ£€æŸ¥æ˜¯å¦æœ‰ç©ºæ ¼
+    for (int i = 0; i < MAX_GRID; ++i)
+    {
+        for (int j = 0; j < MAX_GRID; ++j) 
+        {
+            if (b[i][j].index == 0) 
+            {
+                return false;
+            }
+        }
+    }
+
+    // æ£€æŸ¥æ˜¯å¦æœ‰å¯åˆå¹¶çš„ç›¸é‚»æ ¼å­
+    for (int i = 0; i < MAX_GRID; ++i)
+    {
+        for (int j = 0; j < MAX_GRID; ++j) 
+        {
+            if (i < MAX_GRID - 1 && b[i][j].index == b[i + 1][j].index)
+            {
+                return false;
+            }
+            if (j < MAX_GRID - 1 && b[i][j].index == b[i][j + 1].index)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void Game::updateHighScore()
+{
+    if (currentScore > highScore)
+    {
+        highScore = currentScore;
+        std::ofstream outFile("highscore.dat");
+        if (outFile)
+        {
+            outFile << highScore;
+            outFile.close();
         }
     }
 }
 
-void moveright()
+void Game::drawScore() 
 {
-    for (int i = 0; i < MAX_GRID; i++)
+    setfillcolor(back);
+    solidrectangle(0, WINDOW_HEIGHT - 100, WINDOW_WIDTH, WINDOW_HEIGHT);
+
+    settextstyle(30, 0, _T("å¾®è½¯é›…é»‘"));
+    settextcolor(text);
+    setbkmode(TRANSPARENT);
+
+    TCHAR scoreText[50];
+    _stprintf_s(scoreText, _T("å½“å‰å¾—åˆ†: %d"), currentScore);
+    outtextxy(INTERVAL, WINDOW_HEIGHT - 80, scoreText);
+
+    _stprintf_s(scoreText, _T("æœ€é«˜åˆ†: %d"), highScore);
+    outtextxy(WINDOW_WIDTH / 2 + INTERVAL, WINDOW_HEIGHT - 80, scoreText);
+}
+
+void  Game::BeginDraw()
+{
+    int num = highScore;
+    TCHAR highscore0[50];
+    _stprintf_s(highscore0, _T("%d"), num);
+    setbkcolor(back);
+    cleardevice();
+    settextcolor(RGB(119, 110, 101));
+    settextstyle(50, 0, _T("Î¢ï¿½ï¿½ï¿½Åºï¿½"));
+    setbkmode(TRANSPARENT);//è®¾ç½®èƒŒæ™¯æ¨¡å¼é€æ˜
+    outtextxy(GRID_WIDTH * 2, GRID_WIDTH / 2, _T("2048"));
+    outtextxy(GRID_WIDTH / 4 * 3, GRID_WIDTH * 2, _T("æœ€é«˜åˆ†:"));
+    outtextxy(GRID_WIDTH / 2 * 5, GRID_WIDTH * 2, highscore0);
+    settextstyle(25, 0, _T("Î¢ï¿½ï¿½ï¿½Åºï¿½"));
+    outtextxy(GRID_WIDTH * 3 / 2, GRID_WIDTH * 3, _T("æŒ‰fé”®å¼€å§‹æ¸¸æˆ"));
+}
+void Game::BeginScreen()
+{
+
+    initgraph(MAX_GRID * GRID_WIDTH + 5 * INTERVAL, MAX_GRID * GRID_WIDTH + 5 * INTERVAL);
+    BeginDraw();
+    while (1)
     {
-        int temp = MAX_GRID - 1;
-        for (int begin = MAX_GRID - 2; begin >= 0; begin--)
+
+        char a = _getch();
+        if (a == 'f' || a == 'F')
         {
-            if (b[i][begin].index != 0)
-            {
-                if (b[i][temp].index == 0)
-                {
-                    b[i][temp].index = b[i][begin].index;
-                    b[i][begin].index = 0;
-                }
-                else if (b[i][temp].index == b[i][begin].index)
-                {
-                    b[i][temp].index += b[i][begin].index;
-                    b[i][begin].index = 0;
-                }
-                else
-                {
-                    b[i][temp - 1].index = b[i][begin].index;
-                    if (temp - 1 != begin)
-                    {
-                        b[i][begin].index = 0;
-                    }
-                }
-                temp--;
-                flag = true;
-            }
+            closegraph();
+            break;
         }
     }
+
 }
