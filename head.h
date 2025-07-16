@@ -1,54 +1,68 @@
 #pragma once
 
-#define MAX_GRID 4
-#define GRID_WIDTH 100
-#define INTERVAL 15
-#define WINDOW_WIDTH MAX_GRID*GRID_WIDTH+5*INTERVAL
+#include <vector>
+#include <windows.h>
 
-// Ã¶¾Ù¶¨Òå
-enum Color 
-{ // Ã¶¾Ù¸ñ×ÓÑÕÉ«
-    zero = RGB(216, 209, 196),     // 0µÄÑÕÉ«
-    twoTo1 = RGB(238, 228, 218),   // 2µÄÑÕÉ«
-    twoTo2 = RGB(237, 224, 200),   // 4µÄÑÕÉ«
-    twoTo3 = RGB(242, 177, 121),   // 8µÄÑÕÉ«
-    twoTo4 = RGB(245, 149, 99),    // 16µÄÑÕÉ«
-    twoTo5 = RGB(246, 124, 95),    // 32µÄÑÕÉ«
-    twoTo6 = RGB(246, 94, 59),     // 64µÄÑÕÉ«
-    twoTo7 = RGB(242, 177, 121),   // 128µÄÑÕÉ«
-    twoTo8 = RGB(237, 204, 97),    // 256µÄÑÕÉ«
-    twoTo9 = RGB(255, 0, 128),     // 512µÄÑÕÉ«
-    twoTo10 = RGB(145, 0, 72),     // 1024µÄÑÕÉ«
-    twoTo11 = RGB(242, 17, 158),   // 2048µÄÑÕÉ«
-    back = RGB(187, 173, 160)      // ±³¾°ÑÕÉ«
+const int MAX_GRID = 4;
+const int GRID_WIDTH = 100;
+const int INTERVAL = 15;
+const int WINDOW_WIDTH = MAX_GRID * GRID_WIDTH + 5 * INTERVAL;
+const int WINDOW_HEIGHT = MAX_GRID * GRID_WIDTH + 5 * INTERVAL + 165;
+
+// æšä¸¾é¢œè‰²
+enum Color
+{
+    zero = RGB(216, 209, 196),
+    twoTo1 = RGB(238, 228, 218),
+    twoTo2 = RGB(237, 224, 200),
+    twoTo3 = RGB(242, 177, 121),
+    twoTo4 = RGB(245, 149, 99),
+    twoTo5 = RGB(246, 124, 95),
+    twoTo6 = RGB(246, 94, 59),
+    twoTo7 = RGB(242, 177, 121),
+    twoTo8 = RGB(237, 204, 97),
+    twoTo9 = RGB(255, 0, 128),
+    twoTo10 = RGB(145, 0, 72),
+    twoTo11 = RGB(242, 17, 158),
+    back = RGB(187, 173, 160),
+    text = RGB(119, 110, 101)
 };
-extern Color arr[13];// È«¾Ö±äÁ¿ÑÕÉ«Êı×éÉùÃ÷
 
-//´´½¨Àà¶ÔÏó£º¸ñ×Ó
-class box
+// æ ¼å­ç±»
+class Box 
 {
 public:
-    //ÕâÊÇ×óÉÏ½ÇµÄ×ø±ê
     int x;
     int y;
-    //¸ñ×ÓµÄÊıÖµ
     int index;
 };
-extern box b[MAX_GRID][MAX_GRID];//È«¾ÖboxÀà¶ÔÏóbµÄÉùÃ÷
 
-//ÅĞ¶Ï±êÖ¾
-extern bool flag;
+class Game
+{
+public:
+    Game();
+    void start();
+    void init();
+    void draw();
+    void control();
+    void judge();
+    bool isGameWon();
+    bool isGameOver();
+    void updateHighScore();
+    void drawScore();
+    void BeginScreen();
+    void BeginDraw();
 
-//º¯ÊıÉùÃ÷
-void game_init();
-void game_draw();
-int twoOrfour();        //Ëæ»ú·µ»Ø2ºÍ4
-void putIn();           //·Å½øËæ»ú¸ñ×ÓÀï
-void game_control();    //¼üÅÌ¿ØÖÆÒÆ¶¯
-void judge();           //ÅĞ¶Ïº¯Êı
+private:
+    std::vector<std::vector<Box>> b;
+    std::vector<Color> arr;
+    bool flag;
+    int currentScore;
+    int highScore;
 
-//ÒÆ¶¯º¯Êı
-void moveup();          //ÉÏÒÆ
-void movedown();        //ÏÂÒÆ
-void moveleft();        //×óÒÆ
-void moveright();       //ÓÒÒÆ
+    int twoOrfour();
+    void putIn();
+
+    template<typename Direction>
+    void move(Direction dir);
+};
